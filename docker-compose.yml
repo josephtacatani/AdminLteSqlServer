@@ -10,33 +10,31 @@ services:
     volumes:
       - ./htdocs:/var/www/html  # Map the local `htdocs` folder to the container
     depends_on:
-      - mysql  # Ensure MySQL starts before this service
+      - sqlserver  # Ensure SQL Server starts before this service
 
-  # MySQL Database Service
-  mysql:
-    image: mysql:8.0
-    container_name: mysql
+  # Microsoft SQL Server Database Service
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2019-latest  # Use the latest SQL Server image
+    container_name: sqlserver
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword  # Set the MySQL root password
-      MYSQL_DATABASE: dental_app         # Create a database named `dental_app`
-      MYSQL_USER: myuser                 # Create a MySQL user `myuser`
-      MYSQL_PASSWORD: mypassword         # Set a password for `myuser`
+      SA_PASSWORD: "YourStrong!Passw0rd"  # Set the SQL Server system administrator password
+      ACCEPT_EULA: "Y"  # Accept the SQL Server license agreement
+      MSSQL_PID: "Express"  # Use Express edition (free version)
+    ports:
+      - "1433:1433"  # Expose SQL Server on localhost:1433
     volumes:
-      - mysql-data:/var/lib/mysql  # Persist MySQL data locally
-    ports:
-      - "3306:3306"  # Expose MySQL on localhost:3306
+      - sqlserver-data:/var/opt/mssql  # Persist SQL Server data locally
 
-  # phpMyAdmin Service
-  phpmyadmin:
-    image: phpmyadmin/phpmyadmin
-    container_name: phpmyadmin
+  # Adminer (Alternative to phpMyAdmin for SQL Server)
+  adminer:
+    image: adminer
+    container_name: adminer
     restart: always
     ports:
-      - "8081:80"  # Access phpMyAdmin via http://localhost:8081
+      - "8081:8080"  # Access Adminer via http://localhost:8081
     environment:
-      PMA_HOST: mysql  # Connect phpMyAdmin to the MySQL service
-      MYSQL_ROOT_PASSWORD: rootpassword  # MySQL root password for access
+      ADMINER_DEFAULT_SERVER: sqlserver  # Connect Adminer to the SQL Server service
 
   # Node.js Backend API Service
   nodejs-api:
@@ -46,13 +44,13 @@ services:
     ports:
       - "8082:8082"  # Map Node.js container port 8082 to localhost:8082
     depends_on:
-      - mysql  # Ensure MySQL starts before this service
+      - sqlserver  # Ensure SQL Server starts before this service
     environment:
-      DB_HOST: mysql  # Internal hostname for MySQL
-      DB_PORT: 3306   # MySQL port
-      DB_USER: root
-      DB_PASSWORD: rootpassword
-      DB_DATABASE: dental_app
+      DB_HOST: sqlserver  # Internal hostname for SQL Server
+      DB_PORT: 1433  # SQL Server default port
+      DB_USER: sa  # SQL Server admin user
+      DB_PASSWORD: "YourStrong!Passw0rd"  # SQL Server password
+      DB_DATABASE: dental_app  # Database name
 
 volumes:
-  mysql-data:
+  sqlserver-data:

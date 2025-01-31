@@ -1,169 +1,169 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
-const db = require('../db');
+const { sql, poolPromise } = require('../db'); // ✅ Proper imports
 const { verifyToken, verifyRole } = require('../middlewares/auth');
 
 const router = express.Router();
+
 
 /**
  * ✅ Register a new dentist (Admin only)
  */
 router.post('/register', verifyToken, verifyRole('admin'), async (req, res) => {
-  const {
-    email, password, fullname, photo, birthday, address,
-    gender, contact_number, degree, specialty
-  } = req.body;
+  const { email, password, fullname, photo, birthday, address, gender, contact_number, degree, specialty } = req.body;
 
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
+    const pool = await poolPromise;
 
-    // Insert into `users` table
-    const userSql = `
-      INSERT INTO users (email, password, role, status, fullname, photo, birthday, address, gender, contact_number, email_verified)
-      VALUES (?, ?, 'dentist', 'active', ?, ?, ?, ?, ?, ?, 1)
-    `;
+    // **Check if email already exists**
+    const checkEmail = await pool.request()
+      .input('email', sql.VarChar, email)
+      .query(`SELECT id FROM users WHERE email = @email`);
 
-    db.query(userSql, [email, hashedPassword, fullname, photo, birthday, address, gender, contact_number], (err, userResults) => {
-      if (err) {
-        return res.status(500).json({ message: "Registration failed.", data: null, error: err.message });
-      }
+    if (checkEmail.recordset.length > 0) {
+      return res.status(400).json({ message: "Email already exists. Please use a different email." });
+    }
 
-      const userId = userResults.insertId;
+    // **Insert into users table**
+    const userResult = await pool.request()
+      .input('email', sql.VarChar, email)
+      .input('password', sql.VarChar, hashedPassword)
+      .input('role', sql.VarChar, 'dentist')
+      .input('status', sql.VarChar, 'active')
+      .input('fullname', sql.VarChar, fullname)
+      .input('photo', sql.VarChar, photo)
+      .input('birthday', sql.Date, birthday)
+      .input('address', sql.Text, address)
+      .input('gender', sql.VarChar, gender)
+      .input('contact_number', sql.VarChar, contact_number)
+      .input('email_verified', sql.Bit, 1)
+      .query(`
+        INSERT INTO users (email, password, role, status, fullname, photo, birthday, address, gender, contact_number, email_verified)
+        OUTPUT Inserted.id
+        VALUES (@email, @password, @role, @status, @fullname, @photo, @birthday, @address, @gender, @contact_number, @email_verified)
+      `);
 
-      // Insert into `dentists` table
-      const dentistSql = `INSERT INTO dentists (id, degree, specialty) VALUES (?, ?, ?)`;
-      db.query(dentistSql, [userId, degree, specialty], (dentistErr) => {
-        if (dentistErr) {
-          return res.status(500).json({ message: "Failed to register dentist.", data: null, error: dentistErr.message });
-        }
+    const userId = userResult.recordset[0].id;
 
-        res.status(201).json({
-          message: "Dentist registered successfully.",
-          data: {
-            id: userId, email, fullname, status: 'active', degree, specialty, email_verified: 1
-          },
-          error: null
-        });
-      });
+    // **Insert into dentists table**
+    await pool.request()
+      .input('user_id', sql.Int, userId)  // ✅ Using correct user_id instead of id
+      .input('degree', sql.VarChar, degree)
+      .input('specialty', sql.VarChar, specialty)
+      .query(`INSERT INTO dentists (user_id, degree, specialty) VALUES (@user_id, @degree, @specialty)`);
+
+    res.status(201).json({ 
+      message: "Dentist registered successfully.", 
+      data: { id: userId, email, fullname, degree, specialty, status: 'active' } 
     });
 
   } catch (error) {
-    res.status(500).json({ message: "An error occurred during registration.", data: null, error: error.message });
+    console.error("Dentist Registration Error:", error);
+    res.status(500).json({ message: "An error occurred during registration.", error: error.message });
   }
 });
+
 
 /**
  * ✅ Get all dentists
  */
-router.get('/', verifyToken, (req, res) => {
-  const sql = `
-    SELECT 
-      users.id AS user_id, users.email, users.fullname, users.status,
-      users.photo, users.birthday, users.address, users.gender, 
-      users.contact_number, dentists.degree, dentists.specialty
-    FROM users
-    LEFT JOIN dentists ON users.id = dentists.id
-    WHERE users.role = 'dentist'
-  `;
+router.get('/', verifyToken, async (req, res) => {
+  try {
+    const pool = await poolPromise;
+    const result = await pool.request().query(`
+      SELECT u.id AS user_id, u.email, u.fullname, u.status, u.photo, u.birthday, u.address, u.gender, u.contact_number, d.degree, d.specialty
+      FROM users u
+      JOIN dentists d ON u.id = d.user_id
+      WHERE u.role = 'dentist'`);
 
-  db.query(sql, (err, results) => {
-    if (err) {
-      return res.status(500).json({ message: "Error fetching dentists.", data: null, error: err.message });
-    }
-    res.status(200).json({ message: "Dentists retrieved successfully.", data: results, error: null });
-  });
+    res.status(200).json({ message: "Dentists retrieved successfully.", data: result.recordset });
+  } catch (error) {
+    console.error("Error fetching dentists:", error);
+    res.status(500).json({ message: "Error fetching dentists.", error: error.message });
+  }
 });
 
 /**
  * ✅ Get a specific dentist by ID
  */
-router.get('/:id', verifyToken, (req, res) => {
+router.get('/:id', verifyToken, async (req, res) => {
   const { id } = req.params;
+  if (isNaN(id)) return res.status(400).json({ message: "Invalid dentist ID." });
 
-  // Ensure the ID is a valid number
-  if (isNaN(id)) {
-    return res.status(400).json({ message: "Invalid dentist ID.", data: null, error: null });
+  try {
+    const pool = await poolPromise;
+    const result = await pool.request()
+      .input('id', sql.Int, id)
+      .query(`
+        SELECT u.id AS user_id, u.email, u.fullname, u.status, u.photo, u.birthday, u.address, u.gender, u.contact_number, d.degree, d.specialty
+        FROM users u
+        JOIN dentists d ON u.id = d.user_id
+        WHERE u.id = @id AND u.role = 'dentist'`);
+
+    if (!result.recordset.length) return res.status(404).json({ message: "Dentist not found." });
+
+    res.status(200).json({ message: "Dentist retrieved successfully.", data: result.recordset[0] });
+  } catch (error) {
+    console.error("Error fetching dentist:", error);
+    res.status(500).json({ message: "Error fetching dentist.", error: error.message });
   }
-
-  const sql = `
-    SELECT 
-      users.id AS user_id, users.email, users.fullname, users.status,
-      users.photo, users.birthday, users.address, users.gender, 
-      users.contact_number, dentists.degree, dentists.specialty
-    FROM users
-    LEFT JOIN dentists ON users.id = dentists.id
-    WHERE users.id = ? AND users.role = 'dentist' -- ✅ Ensures only dentists are retrieved
-  `;
-
-  db.query(sql, [id], (err, results) => {
-    if (err) {
-      return res.status(500).json({ message: "Error fetching dentist by ID.", data: null, error: err.message });
-    }
-    if (!results.length) {
-      return res.status(404).json({ message: "Dentist not found.", data: null, error: null });
-    }
-    res.status(200).json({ message: "Dentist retrieved successfully.", data: results[0], error: null });
-  });
 });
-
 
 /**
  * ✅ Update a dentist's details
  */
-router.put('/:id', verifyToken, verifyRole('admin', 'dentist'), (req, res) => {
+router.put('/:id', verifyToken, verifyRole('admin', 'dentist'), async (req, res) => {
   const { id } = req.params;
   const { fullname, photo, birthday, address, gender, contact_number, degree, specialty } = req.body;
+  if (isNaN(id)) return res.status(400).json({ message: "Invalid dentist ID." });
 
-  if (isNaN(id)) {
-    return res.status(400).json({ message: "Invalid dentist ID.", data: null, error: null });
+  try {
+    const pool = await poolPromise;
+    await pool.request()
+      .input('id', sql.Int, id)
+      .input('fullname', sql.VarChar, fullname)
+      .input('photo', sql.VarChar, photo)
+      .input('birthday', sql.Date, birthday)
+      .input('address', sql.Text, address)
+      .input('gender', sql.VarChar, gender)
+      .input('contact_number', sql.VarChar, contact_number)
+      .query(`
+        UPDATE users 
+        SET fullname = @fullname, photo = @photo, birthday = @birthday, address = @address, gender = @gender, contact_number = @contact_number
+        WHERE id = @id
+      `);
+
+    await pool.request()
+      .input('id', sql.Int, id)
+      .input('degree', sql.VarChar, degree)
+      .input('specialty', sql.VarChar, specialty)
+      .query(`UPDATE dentists SET degree = @degree, specialty = @specialty WHERE user_id = @id`);
+
+    res.status(200).json({ message: "Dentist details updated successfully." });
+  } catch (error) {
+    console.error("Error updating dentist:", error);
+    res.status(500).json({ message: "Error updating dentist details.", error: error.message });
   }
-
-  const updateUserSql = `
-    UPDATE users 
-    SET fullname = ?, photo = ?, birthday = ?, address = ?, gender = ?, contact_number = ?
-    WHERE id = ?
-  `;
-
-  db.query(updateUserSql, [fullname, photo, birthday, address, gender, contact_number, id], (userErr, userResults) => {
-    if (userErr) {
-      return res.status(500).json({ message: "Error updating dentist details.", data: null, error: userErr.message });
-    }
-    if (userResults.affectedRows === 0) {
-      return res.status(404).json({ message: "Dentist not found.", data: null, error: null });
-    }
-
-    const updateDentistSql = `UPDATE dentists SET degree = ?, specialty = ? WHERE id = ?`;
-    db.query(updateDentistSql, [degree, specialty, id], (dentistErr) => {
-      if (dentistErr) {
-        return res.status(500).json({ message: "Error updating dentist specialization.", data: null, error: dentistErr.message });
-      }
-
-      res.status(200).json({ message: "Dentist details updated successfully.", data: null, error: null });
-    });
-  });
 });
 
 /**
  * ✅ Delete a dentist (Admin only)
  */
-router.delete('/:id', verifyToken, verifyRole('admin'), (req, res) => {
+router.delete('/:id', verifyToken, verifyRole('admin'), async (req, res) => {
   const { id } = req.params;
+  if (isNaN(id)) return res.status(400).json({ message: "Invalid dentist ID." });
 
-  if (isNaN(id)) {
-    return res.status(400).json({ message: "Invalid dentist ID.", data: null, error: null });
+  try {
+    const pool = await poolPromise;
+    await pool.request().input('id', sql.Int, id).query(`DELETE FROM dentists WHERE user_id = @id`);
+    await pool.request().input('id', sql.Int, id).query(`DELETE FROM users WHERE id = @id`);
+
+    res.status(200).json({ message: "Dentist deleted successfully." });
+  } catch (error) {
+    console.error("Error deleting dentist:", error);
+    res.status(500).json({ message: "Error deleting dentist.", error: error.message });
   }
-
-  const sql = `DELETE FROM users WHERE id = ?`;
-
-  db.query(sql, [id], (err, results) => {
-    if (err) {
-      return res.status(500).json({ message: "Error deleting dentist.", data: null, error: err.message });
-    }
-    if (results.affectedRows === 0) {
-      return res.status(404).json({ message: "Dentist not found.", data: null, error: null });
-    }
-    res.status(200).json({ message: "Dentist deleted successfully.", data: null, error: null });
-  });
 });
 
 module.exports = router;
