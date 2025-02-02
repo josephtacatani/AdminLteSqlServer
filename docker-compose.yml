@@ -1,30 +1,22 @@
 version: '3.8'
 
 services:
-  # Apache + PHP Service
-  apache-php:
-    image: php:8.2-apache
-    container_name: apache-php
-    ports:
-      - "8080:80"  # Map Apache container port 80 to localhost:8080
-    volumes:
-      - ./htdocs:/var/www/html  # Map the local `htdocs` folder to the container
-    depends_on:
-      - sqlserver  # Ensure SQL Server starts before this service
-
   # Microsoft SQL Server Database Service
   sqlserver:
-    image: mcr.microsoft.com/mssql/server:2019-latest  # Use the latest SQL Server image
+    image: mcr.microsoft.com/mssql/server:2022-latest 
     container_name: sqlserver
-    restart: always
     environment:
-      SA_PASSWORD: "YourStrong!Passw0rd"  # Set the SQL Server system administrator password
-      ACCEPT_EULA: "Y"  # Accept the SQL Server license agreement
-      MSSQL_PID: "Express"  # Use Express edition (free version)
+      SA_PASSWORD: "YourStrong!Passw0rd"
+      ACCEPT_EULA: "Y"
+      MSSQL_AGENT_ENABLED: "true"          # Enables SQL Server Agent (optional)
+      MSSQL_TLS_ENABLED: "false"           # Disable TLS encryption (for local/dev use)
     ports:
-      - "1433:1433"  # Expose SQL Server on localhost:1433
+      - "1433:1433"
     volumes:
-      - sqlserver-data:/var/opt/mssql  # Persist SQL Server data locally
+      - ./backup:/var/opt/mssql/backup
+      - sqlserver-data:/var/opt/mssql/data
+    user: "0:0"  # Run as roo
+    
 
   # Adminer (Alternative to phpMyAdmin for SQL Server)
   adminer:
@@ -32,25 +24,27 @@ services:
     container_name: adminer
     restart: always
     ports:
-      - "8081:8080"  # Access Adminer via http://localhost:8081
+      - "8081:8080"
     environment:
-      ADMINER_DEFAULT_SERVER: sqlserver  # Connect Adminer to the SQL Server service
+      ADMINER_DEFAULT_SERVER: sqlserver
+    depends_on:
+      - sqlserver
 
   # Node.js Backend API Service
-  nodejs-api:
-    build:
-      context: .  # Build the Node.js app using the Dockerfile in the current directory
-    container_name: nodejs-api
-    ports:
-      - "8082:8082"  # Map Node.js container port 8082 to localhost:8082
-    depends_on:
-      - sqlserver  # Ensure SQL Server starts before this service
-    environment:
-      DB_HOST: sqlserver  # Internal hostname for SQL Server
-      DB_PORT: 1433  # SQL Server default port
-      DB_USER: sa  # SQL Server admin user
-      DB_PASSWORD: "YourStrong!Passw0rd"  # SQL Server password
-      DB_DATABASE: dental_app  # Database name
+  # nodejs-api:
+  #   build:
+  #     context: .
+  #   container_name: nodejs-api
+  #   ports:
+  #     - "8082:8082"
+  #   depends_on:
+  #     - sqlserver
+  #   environment:
+  #     DB_HOST: sqlserver
+  #     DB_PORT: 1433
+  #     DB_USER: sa
+  #     DB_PASSWORD: "YourStrong!Passw0rd"
+  #     DB_DATABASE: dental_app
 
 volumes:
   sqlserver-data:
