@@ -6,6 +6,100 @@ const { generateTimeslots } = require('../utils/timeslotHelper');
 
 const router = express.Router();
 
+
+/**
+ * ✅ Get all schedules
+ */
+router.get('/', verifyToken, async (req, res) => {
+  try {
+    const pool = await poolPromise;
+    const result = await pool.request().query(`
+      SELECT 
+        id,
+        dentist_id,
+        CONVERT(VARCHAR, date, 23) AS date,
+        start_time,
+        end_time,
+        created_at,
+        updated_at
+      FROM schedules
+    `);
+
+    successResponse(res, 'Schedules retrieved successfully.', result.recordset);
+  } catch (error) {
+    console.error("❌ Error fetching all schedules:", error);
+    errorResponse(res, 'Error fetching schedules.', null, error.message, 500);
+  }
+});
+
+/**
+ * ✅ Get a schedule by ID
+ */
+router.get('/:id', verifyToken, async (req, res) => {
+  const { id } = req.params;
+
+  if (isNaN(id)) {
+    return errorResponse(res, 'Invalid schedule ID.', null, 400);
+  }
+
+  try {
+    const pool = await poolPromise;
+    const result = await pool.request()
+      .input('id', sql.Int, id)
+      .query(`SELECT * FROM schedules WHERE id = @id`);
+
+    if (!result.recordset.length) {
+      return errorResponse(res, 'Schedule not found.', null, 404);
+    }
+
+    successResponse(res, 'Schedule retrieved successfully.', result.recordset[0]);
+  } catch (error) {
+    console.error("❌ Error fetching schedule:", error);
+    errorResponse(res, 'Error fetching schedule.', null, error.message, 500);
+  }
+});
+
+/**
+ * ✅ Delete a schedule
+ */
+router.delete('/:id', verifyToken, verifyRole('dentist', 'admin'), async (req, res) => {
+  const { id } = req.params;
+
+  if (isNaN(id)) {
+    return errorResponse(res, 'Invalid schedule ID.', null, 400);
+  }
+
+  try {
+    const pool = await poolPromise;
+    const transaction = pool.transaction();
+    await transaction.begin();
+
+    const scheduleCheck = await transaction.request()
+      .input('id', sql.Int, id)
+      .query(`SELECT * FROM schedules WHERE id = @id`);
+
+    if (!scheduleCheck.recordset.length) {
+      await transaction.rollback();
+      return errorResponse(res, 'Schedule not found.', null, 404);
+    }
+
+    await transaction.request()
+      .input('schedule_id', sql.Int, id)
+      .query(`DELETE FROM timeslots WHERE schedule_id = @schedule_id`);
+
+    await transaction.request()
+      .input('id', sql.Int, id)
+      .query(`DELETE FROM schedules WHERE id = @id`);
+
+    await transaction.commit();
+    successResponse(res, 'Schedule and associated timeslots deleted successfully.');
+  } catch (error) {
+    console.error("❌ Error deleting schedule:", error);
+    errorResponse(res, 'Error deleting schedule.', null, error.message, 500);
+  }
+});
+
+
 // ✅ Validate time format (HH:mm)
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
