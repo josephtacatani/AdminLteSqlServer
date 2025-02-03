@@ -1,79 +1,22 @@
 /**
  * @swagger
- * components:
- *   schemas:
- *     Appointment:
- *       type: object
- *       description: Details of an appointment.
- *       properties:
- *         id:
- *           type: integer
- *           description: Unique identifier for the appointment.
- *           example: 1
- *         patient_id:
- *           type: integer
- *           description: The unique identifier of the patient.
- *           example: 48
- *         dentist_id:
- *           type: integer
- *           description: The unique identifier of the assigned dentist.
- *           example: 39
- *         schedule_id:
- *           type: integer
- *           description: The ID of the selected schedule.
- *           example: 28
- *         timeslot_id:
- *           type: integer
- *           description: The ID of the selected time slot.
- *           example: 109
- *         status:
- *           type: string
- *           enum: [pending, confirmed, canceled]
- *           description: The current status of the appointment.
- *           example: pending
- *         appointment_type:
- *           type: string
- *           enum: [online, walk_in]
- *           description: The type of appointment.
- *           example: online
- *         health_declaration_id:
- *           type: integer
- *           nullable: true
- *           description: (Optional) The health declaration ID required before booking. If not provided, the system will fetch the latest one. If no record exists, the request will be rejected.
- *           example: 5
- *     AppointmentService:
- *       type: object
- *       description: Services linked to an appointment.
- *       properties:
- *         appointment_id:
- *           type: integer
- *           description: The ID of the associated appointment.
- *           example: 1
- *         service_list_id:
- *           type: integer
- *           description: The ID of the selected service.
- *           example: 3
- */
-
-/**
- * @swagger
  * tags:
  *   name: Appointments
- *   description: API endpoints for managing appointments.
+ *   description: API endpoints for managing appointments
  */
 
 /**
  * @swagger
  * /appointments:
  *   get:
- *     summary: Retrieve all appointments
- *     description: Fetches a list of all scheduled appointments.
+ *     summary: Get all appointments
+ *     description: Retrieves all appointments. Requires authentication.
  *     tags: [Appointments]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Successfully retrieved all appointments.
+ *         description: Appointments retrieved successfully.
  *         content:
  *           application/json:
  *             schema:
@@ -87,15 +30,35 @@
  *                   items:
  *                     $ref: '#/components/schemas/Appointment'
  *       401:
- *         description: Unauthorized access - Token required.
+ *         description: Unauthorized access.
+ *
+ *   post:
+ *     summary: Create a new appointment
+ *     description: Creates a new appointment. Requires authentication.
+ *     tags: [Appointments]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AppointmentInput'
+ *     responses:
+ *       201:
+ *         description: Appointment created successfully.
+ *       400:
+ *         description: Invalid input data.
+ *       401:
+ *         description: Unauthorized access.
  */
 
 /**
  * @swagger
  * /appointments/{id}:
  *   get:
- *     summary: Retrieve a specific appointment by ID
- *     description: Fetches details of an appointment based on the provided ID.
+ *     summary: Get appointment by ID
+ *     description: Retrieves an appointment by its ID. Requires authentication.
  *     tags: [Appointments]
  *     security:
  *       - bearerAuth: []
@@ -105,131 +68,18 @@
  *         required: true
  *         schema:
  *           type: integer
- *         description: The ID of the requested appointment.
+ *         description: Appointment ID
  *     responses:
  *       200:
- *         description: Successfully retrieved the appointment details.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Appointment retrieved successfully."
- *                 data:
- *                   $ref: '#/components/schemas/Appointment'
+ *         description: Appointment retrieved successfully.
  *       404:
  *         description: Appointment not found.
  *       401:
- *         description: Unauthorized access - Token required.
- */
-
-/**
- * @swagger
- * /appointments:
- *   post:
- *     summary: Create a new appointment
- *     description: Schedules a new appointment with a dentist and selected services.
- *     tags: [Appointments]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - patient_id
- *               - dentist_id
- *               - schedule_id
- *               - timeslot_id
- *               - status
- *               - appointment_type
- *               - service_list_id
- *             properties:
- *               patient_id:
- *                 type: integer
- *                 description: The ID of the patient booking the appointment.
- *                 example: 31
- *               dentist_id:
- *                 type: integer
- *                 description: The ID of the assigned dentist.
- *                 example: 39
- *               schedule_id:
- *                 type: integer
- *                 description: The ID of the selected schedule.
- *                 example: 28
- *               timeslot_id:
- *                 type: integer
- *                 description: The ID of the selected time slot.
- *                 example: 109
- *               status:
- *                 type: string
- *                 enum: [pending, confirmed, canceled]
- *                 description: The status of the appointment.
- *                 example: pending
- *               appointment_type:
- *                 type: string
- *                 enum: [online, walk_in]
- *                 description: The type of appointment.
- *                 example: online
- *               service_list_id:
- *                 type: array
- *                 items:
- *                   type: integer
- *                 description: List of selected service IDs for the appointment.
- *                 example: [1, 2, 3]
-
- *     responses:
- *       201:
- *         description: Appointment successfully created.
- *       400:
- *         description: Bad Request - Missing required fields or health declaration not found.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Missing required fields or health declaration is required before booking an appointment."
- *                 error:
- *                   type: string
- *                   example: "service_list_id must be an array with at least one service."
- *       401:
- *         description: Unauthorized access - Token required.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Unauthorized access."
- *       500:
- *         description: Internal Server Error.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Error creating appointment."
- *                 error:
- *                   type: string
- *                   example: "Database connection lost."
- */
-
-
-/**
- * @swagger
- * /appointments/{id}:
+ *         description: Unauthorized access.
+ *
  *   put:
- *     summary: Update an existing appointment
- *     description: Updates an appointment, including patient, dentist, schedule, timeslot, and associated services. Uses transactions to ensure data integrity.
+ *     summary: Update an appointment
+ *     description: Updates an existing appointment. Requires authentication.
  *     tags: [Appointments]
  *     security:
  *       - bearerAuth: []
@@ -239,128 +89,26 @@
  *         required: true
  *         schema:
  *           type: integer
- *         description: The unique ID of the appointment to update.
+ *         description: Appointment ID
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required:
- *               - patient_id
- *               - dentist_id
- *               - schedule_id
- *               - timeslot_id
- *               - status
- *               - appointment_type
- *               - service_list_id
- *             properties:
- *               patient_id:
- *                 type: integer
- *                 description: The ID of the patient linked to the appointment.
- *                 example: 31
- *               dentist_id:
- *                 type: integer
- *                 description: The ID of the assigned dentist.
- *                 example: 39
- *               schedule_id:
- *                 type: integer
- *                 description: The ID of the selected schedule.
- *                 example: 28
- *               timeslot_id:
- *                 type: integer
- *                 description: The ID of the selected timeslot.
- *                 example: 109
- *               status:
- *                 type: string
- *                 enum: [pending, confirmed, canceled]
- *                 description: The status of the appointment.
- *                 example: confirmed
- *               appointment_type:
- *                 type: string
- *                 enum: [online, walk_in]
- *                 description: The type of appointment.
- *                 example: online
- *               service_list_id:
- *                 type: array
- *                 items:
- *                   type: integer
- *                 description: A list of service IDs associated with the appointment.
- *                 example: [1, 2, 3]
-
+ *             $ref: '#/components/schemas/AppointmentInput'
  *     responses:
  *       200:
  *         description: Appointment updated successfully.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Appointment updated successfully."
- *                 data:
- *                   type: object
- *                   properties:
- *                     appointmentId:
- *                       type: integer
- *                       example: 31
  *       400:
- *         description: Missing required fields or invalid input.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Missing required fields or invalid service list."
- *                 error:
- *                   type: string
- *                   example: null
+ *         description: Invalid input data.
  *       404:
  *         description: Appointment not found.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Appointment not found."
  *       401:
- *         description: Unauthorized access - Token required.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Unauthorized access."
- *       500:
- *         description: Internal Server Error.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Error updating appointment."
- *                 error:
- *                   type: string
- *                   example: "Database connection lost."
- */
-
-
-
-/**
- * @swagger
- * /appointments/{id}:
+ *         description: Unauthorized access.
+ *
  *   delete:
- *     summary: Remove an appointment
- *     description: Deletes an appointment from the system.
+ *     summary: Delete an appointment
+ *     description: Deletes an appointment by ID. Requires authentication.
  *     tags: [Appointments]
  *     security:
  *       - bearerAuth: []
@@ -370,22 +118,22 @@
  *         required: true
  *         schema:
  *           type: integer
- *         description: The ID of the appointment to delete.
+ *         description: Appointment ID
  *     responses:
  *       200:
- *         description: Successfully deleted appointment.
+ *         description: Appointment deleted successfully.
  *       404:
  *         description: Appointment not found.
  *       401:
- *         description: Unauthorized access - Token required.
+ *         description: Unauthorized access.
  */
 
 /**
  * @swagger
  * /appointments/by-patient/{patient_id}:
  *   get:
- *     summary: Retrieve an appointment by Patient ID
- *     description: Fetches the most recent appointment for a specific patient based on their ID.
+ *     summary: Get appointment by patient ID
+ *     description: Retrieves appointments for a specific patient. Requires authentication.
  *     tags: [Appointments]
  *     security:
  *       - bearerAuth: []
@@ -395,56 +143,14 @@
  *         required: true
  *         schema:
  *           type: integer
- *         description: The unique ID of the patient whose appointment is being retrieved.
+ *         description: Patient ID
  *     responses:
  *       200:
- *         description: Successfully retrieved the appointment.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Appointment retrieved successfully."
- *                 data:
- *                   $ref: '#/components/schemas/Appointment'
+ *         description: Appointments retrieved successfully.
  *       404:
- *         description: No appointment found for the given patient ID.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "No appointment found for this patient."
- *                 error:
- *                   type: string
- *                   example: null
+ *         description: No appointments found for the patient.
  *       401:
- *         description: Unauthorized access - Token required.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Unauthorized access."
- *       500:
- *         description: Internal Server Error.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Error fetching appointment by patient ID."
- *                 error:
- *                   type: string
- *                   example: "Database connection error."
+ *         description: Unauthorized access.
  */
 
 /**
@@ -452,7 +158,7 @@
  * /appointments/cancel/{appointment_id}:
  *   patch:
  *     summary: Cancel an appointment
- *     description: Marks an existing appointment as canceled, making the associated timeslot available again.
+ *     description: Cancels an appointment by updating its status. Requires authentication.
  *     tags: [Appointments]
  *     security:
  *       - bearerAuth: []
@@ -462,74 +168,22 @@
  *         required: true
  *         schema:
  *           type: integer
- *         description: The ID of the appointment to cancel.
+ *         description: Appointment ID
  *     responses:
  *       200:
  *         description: Appointment canceled successfully.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Appointment canceled successfully."
- *                 data:
- *                   type: object
- *                   properties:
- *                     appointment_id:
- *                       type: integer
- *                       example: 32
- *                     status:
- *                       type: string
- *                       example: "canceled"
- *       400:
- *         description: Bad request - missing required fields.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Invalid appointment ID."
- *                 error:
- *                   type: string
- *                   example: null
  *       404:
  *         description: Appointment not found.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Appointment not found."
- *                 error:
- *                   type: string
- *                   example: null
- *       500:
- *         description: Server error while canceling appointment.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Error canceling appointment."
- *                 error:
- *                   type: string
- *                   example: "Database connection issue."
+ *       401:
+ *         description: Unauthorized access.
  */
-
 
 /**
  * @swagger
  * /appointments/getAllAppointmentsWithServicesByPatientId/{patient_id}:
  *   get:
- *     summary: Get all appointments for a patient with detailed services
+ *     summary: Get all appointments with services by patient ID
+ *     description: Retrieves all appointments along with related services for a specific patient. Requires authentication.
  *     tags: [Appointments]
  *     security:
  *       - bearerAuth: []
@@ -539,55 +193,71 @@
  *         required: true
  *         schema:
  *           type: integer
- *         description: The ID of the patient
+ *         description: Patient ID
  *     responses:
  *       200:
- *         description: Detailed appointments retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 data:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       appointment_id:
- *                         type: integer
- *                       status:
- *                         type: string
- *                       appointment_type:
- *                         type: string
- *                       schedule_date:
- *                         type: string
- *                         format: date
- *                       timeslot_start_time:
- *                         type: string
- *                         format: time
- *                       timeslot_end_time:
- *                         type: string
- *                         format: time
- *                       dentist_name:
- *                         type: string
- *                       patient_name:
- *                         type: string
- *                       services:
- *                         type: array
- *                         items:
- *                           type: object
- *                           properties:
- *                             service_id:
- *                               type: integer
- *                             service_name:
- *                               type: string
- *       401:
- *         description: Unauthorized - Token is missing or invalid
+ *         description: Appointments with services retrieved successfully.
  *       404:
- *         description: No appointments found for this patient
- *       500:
- *         description: Internal server error
+ *         description: No appointments found for this patient.
+ *       401:
+ *         description: Unauthorized access.
  */
 
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     Appointment:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: integer
+ *           example: 1
+ *         patient_id:
+ *           type: integer
+ *           example: 101
+ *         dentist_id:
+ *           type: integer
+ *           example: 202
+ *         schedule_id:
+ *           type: integer
+ *           example: 303
+ *         timeslot_id:
+ *           type: integer
+ *           example: 404
+ *         status:
+ *           type: string
+ *           example: "confirmed"
+ *         appointment_type:
+ *           type: string
+ *           example: "checkup"
+ *     AppointmentInput:
+ *       type: object
+ *       properties:
+ *         patient_id:
+ *           type: integer
+ *           example: 101
+ *         dentist_id:
+ *           type: integer
+ *           example: 202
+ *         schedule_id:
+ *           type: integer
+ *           example: 303
+ *         timeslot_id:
+ *           type: integer
+ *           example: 404
+ *         status:
+ *           type: string
+ *           example: "pending"
+ *         appointment_type:
+ *           type: string
+ *           example: "consultation"
+ *         service_list_id:
+ *           type: array
+ *           items:
+ *             type: integer
+ *           example: [1, 2, 3]
+ *         health_declaration_id:
+ *           type: integer
+ *           example: 505
+ */
