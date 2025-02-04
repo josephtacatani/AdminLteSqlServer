@@ -34,7 +34,10 @@
  *
  *   post:
  *     summary: Create a new appointment
- *     description: Creates a new appointment. Requires authentication.
+ *     description: |
+ *       Creates a new appointment. Requires authentication.
+ *       - Appointment creation requires an existing health declaration for the patient (validated automatically).
+ *       - If the health declaration is missing, the appointment will not be created.
  *     tags: [Appointments]
  *     security:
  *       - bearerAuth: []
@@ -47,8 +50,26 @@
  *     responses:
  *       201:
  *         description: Appointment created successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Appointment created successfully."
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     appointmentId:
+ *                       type: integer
+ *                       example: 123
  *       400:
- *         description: Invalid input data.
+ *         description: |
+ *           Invalid input data or missing health declaration.
+ *           Example error messages:
+ *           - "Missing required fields or invalid service list."
+ *           - "Health declaration not found. Appointment cannot be created."
  *       401:
  *         description: Unauthorized access.
  */
@@ -72,6 +93,10 @@
  *     responses:
  *       200:
  *         description: Appointment retrieved successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Appointment'
  *       404:
  *         description: Appointment not found.
  *       401:
@@ -132,7 +157,7 @@
  * @swagger
  * /appointments/by-patient/{patient_id}:
  *   get:
- *     summary: Get appointment by patient ID
+ *     summary: Get appointments by patient ID
  *     description: Retrieves appointments for a specific patient. Requires authentication.
  *     tags: [Appointments]
  *     security:
@@ -147,6 +172,12 @@
  *     responses:
  *       200:
  *         description: Appointments retrieved successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Appointment'
  *       404:
  *         description: No appointments found for the patient.
  *       401:
@@ -197,6 +228,12 @@
  *     responses:
  *       200:
  *         description: Appointments with services retrieved successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Appointment'
  *       404:
  *         description: No appointments found for this patient.
  *       401:
@@ -216,9 +253,15 @@
  *         patient_id:
  *           type: integer
  *           example: 101
+ *         patient_fullname:
+ *           type: string
+ *           example: "John Doe"
  *         dentist_id:
  *           type: integer
  *           example: 202
+ *         dentist_fullname:
+ *           type: string
+ *           example: "Dr. Jane Smith"
  *         schedule_id:
  *           type: integer
  *           example: 303
@@ -231,8 +274,21 @@
  *         appointment_type:
  *           type: string
  *           example: "checkup"
+ *         created_at:
+ *           type: string
+ *           format: date-time
+ *           example: "2025-02-05T10:00:00Z"
+
  *     AppointmentInput:
  *       type: object
+ *       required:
+ *         - patient_id
+ *         - dentist_id
+ *         - schedule_id
+ *         - timeslot_id
+ *         - status
+ *         - appointment_type
+ *         - service_list_id
  *       properties:
  *         patient_id:
  *           type: integer
@@ -257,7 +313,4 @@
  *           items:
  *             type: integer
  *           example: [1, 2, 3]
- *         health_declaration_id:
- *           type: integer
- *           example: 505
  */

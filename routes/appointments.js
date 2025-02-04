@@ -9,12 +9,66 @@ const router = express.Router();
 router.get('/', verifyToken, async (req, res) => {
   try {
     const pool = await poolPromise;
-    const result = await pool.request().query('SELECT * FROM appointments');
-    successResponse(res, 'Appointments retrieved successfully.', result.recordset);
+
+    const query = `
+      SELECT 
+        a.id AS appointment_id,
+        a.status,
+        a.appointment_type,
+
+        -- Patient Full Name
+        patient.fullname AS patient_fullname,
+
+        -- Dentist Full Name
+        dentist.fullname AS dentist_fullname,
+
+        -- Schedule Info
+        s.id AS schedule_id,
+        s.date AS schedule_date,
+
+        -- Timeslot Info
+        t.id AS timeslot_id,
+        t.start_time,
+        t.end_time
+
+      FROM appointments AS a
+      LEFT JOIN users AS patient ON a.patient_id = patient.id
+      LEFT JOIN users AS dentist ON a.dentist_id = dentist.id
+      LEFT JOIN schedules AS s ON a.schedule_id = s.id
+      LEFT JOIN timeslots AS t ON a.timeslot_id = t.id
+    `;
+
+    const result = await pool.request().query(query);
+
+    // Map the appointments with patient and dentist full names
+    const appointments = result.recordset.map(row => ({
+      id: row.appointment_id,
+      status: row.status,
+      appointment_type: row.appointment_type,
+
+      patient_fullname: row.patient_fullname,
+      dentist_fullname: row.dentist_fullname,
+
+      schedule: {
+        id: row.schedule_id,
+        date: row.schedule_date
+      },
+
+      timeslot: {
+        id: row.timeslot_id,
+        start_time: row.start_time,
+        end_time: row.end_time
+      }
+    }));
+
+    successResponse(res, 'Appointments retrieved successfully.', appointments);
   } catch (error) {
+    console.error('Error fetching appointments:', error);
     errorResponse(res, 'Error fetching appointments.', null, error.message, 500);
   }
 });
+
+
 
 /** ✅ Get Appointment by ID */
 router.get('/:id', verifyToken, async (req, res) => {
@@ -36,7 +90,7 @@ router.get('/:id', verifyToken, async (req, res) => {
 
 /** ✅ Create Appointment */
 router.post('/', verifyToken, async (req, res) => {
-  const { patient_id, dentist_id, schedule_id, timeslot_id, status, appointment_type, service_list_id, health_declaration_id } = req.body;
+  const { patient_id, dentist_id, schedule_id, timeslot_id, status, appointment_type, service_list_id } = req.body;
 
   if (!patient_id || !dentist_id || !schedule_id || !timeslot_id || !status || !appointment_type || !Array.isArray(service_list_id) || service_list_id.length === 0) {
     return errorResponse(res, 'Missing required fields or invalid service list.', null, 400);
@@ -44,9 +98,20 @@ router.post('/', verifyToken, async (req, res) => {
 
   try {
     const pool = await poolPromise;
+
+    // ✅ Check if the patient has an existing health declaration
+    const healthDeclarationResult = await pool.request()
+      .input('user_id', sql.Int, patient_id)
+      .query('SELECT id FROM health_declarations WHERE user_id = @user_id');
+
+    if (healthDeclarationResult.recordset.length === 0) {
+      return errorResponse(res, 'Health declaration not found. Appointment cannot be created.', null, 400);
+    }
+
     const transaction = pool.transaction();
     await transaction.begin();
 
+    // ✅ Insert the appointment (NO NEED FOR health_declaration_id)
     const appointmentResult = await transaction.request()
       .input('patient_id', sql.Int, patient_id)
       .input('dentist_id', sql.Int, dentist_id)
@@ -54,15 +119,15 @@ router.post('/', verifyToken, async (req, res) => {
       .input('timeslot_id', sql.Int, timeslot_id)
       .input('status', sql.VarChar, status)
       .input('appointment_type', sql.VarChar, appointment_type)
-      .input('health_declaration_id', sql.Int, health_declaration_id)
       .query(`
-        INSERT INTO appointments (patient_id, dentist_id, schedule_id, timeslot_id, status, appointment_type, health_declaration_id)
+        INSERT INTO appointments (patient_id, dentist_id, schedule_id, timeslot_id, status, appointment_type)
         OUTPUT INSERTED.id
-        VALUES (@patient_id, @dentist_id, @schedule_id, @timeslot_id, @status, @appointment_type, @health_declaration_id)
+        VALUES (@patient_id, @dentist_id, @schedule_id, @timeslot_id, @status, @appointment_type)
       `);
 
     const appointmentId = appointmentResult.recordset[0].id;
 
+    // ✅ Insert appointment services
     for (const serviceId of service_list_id) {
       await transaction.request()
         .input('appointment_id', sql.Int, appointmentId)
@@ -75,14 +140,19 @@ router.post('/', verifyToken, async (req, res) => {
 
   } catch (error) {
     errorResponse(res, 'Error creating appointment.', null, error.message, 500);
+    console.error('Error creating appointment:', error);
   }
 });
+
+
+
 
 /** ✅ Update Appointment */
 router.put('/:id', verifyToken, async (req, res) => {
   const { id } = req.params;
-  const { patient_id, dentist_id, schedule_id, timeslot_id, status, appointment_type, service_list_id, health_declaration_id } = req.body;
+  const { patient_id, dentist_id, schedule_id, timeslot_id, status, appointment_type, service_list_id } = req.body;
 
+  // ✅ Validate required fields
   if (!patient_id || !dentist_id || !schedule_id || !timeslot_id || !status || !appointment_type || !Array.isArray(service_list_id) || service_list_id.length === 0) {
     return errorResponse(res, 'Missing required fields or invalid service list.', null, 400);
   }
@@ -92,8 +162,12 @@ router.put('/:id', verifyToken, async (req, res) => {
     const transaction = pool.transaction();
     await transaction.begin();
 
-    await transaction.request().input('id', sql.Int, id).query('DELETE FROM appointment_services WHERE appointment_id = @id');
+    // ✅ Remove old services linked to this appointment
+    await transaction.request()
+      .input('id', sql.Int, id)
+      .query('DELETE FROM appointment_services WHERE appointment_id = @id');
 
+    // ✅ Update the appointment (health_declaration_id removed)
     await transaction.request()
       .input('id', sql.Int, id)
       .input('patient_id', sql.Int, patient_id)
@@ -102,29 +176,38 @@ router.put('/:id', verifyToken, async (req, res) => {
       .input('timeslot_id', sql.Int, timeslot_id)
       .input('status', sql.VarChar, status)
       .input('appointment_type', sql.VarChar, appointment_type)
-      .input('health_declaration_id', sql.Int, health_declaration_id)
       .query(`
         UPDATE appointments
-        SET patient_id = @patient_id, dentist_id = @dentist_id, schedule_id = @schedule_id,
-            timeslot_id = @timeslot_id, status = @status, appointment_type = @appointment_type,
-            health_declaration_id = @health_declaration_id
+        SET patient_id = @patient_id,
+            dentist_id = @dentist_id,
+            schedule_id = @schedule_id,
+            timeslot_id = @timeslot_id,
+            status = @status,
+            appointment_type = @appointment_type
         WHERE id = @id
       `);
 
+    // ✅ Insert updated services
     for (const serviceId of service_list_id) {
       await transaction.request()
         .input('appointment_id', sql.Int, id)
         .input('service_list_id', sql.Int, serviceId)
-        .query('INSERT INTO appointment_services (appointment_id, service_list_id) VALUES (@appointment_id, @service_list_id)');
+        .query(`
+          INSERT INTO appointment_services (appointment_id, service_list_id)
+          VALUES (@appointment_id, @service_list_id)
+        `);
     }
 
     await transaction.commit();
     successResponse(res, 'Appointment updated successfully.', { appointmentId: id });
 
   } catch (error) {
+    await transaction.rollback();  // Ensure rollback on error
+    console.error('❌ Error updating appointment:', error);
     errorResponse(res, 'Error updating appointment.', null, error.message, 500);
   }
 });
+
 
 /** ✅ Delete Appointment */
 router.delete('/:id', verifyToken, async (req, res) => {
