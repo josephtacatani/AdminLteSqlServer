@@ -1,22 +1,61 @@
 /**
  * @swagger
  * tags:
- *   name: Appointments
- *   description: API endpoints for managing appointments
+ *   name: Schedules
+ *   description: API endpoints for managing dentist schedules
  */
 
 /**
  * @swagger
- * /appointments:
+ * components:
+ *   securitySchemes:
+ *     bearerAuth:
+ *       type: http
+ *       scheme: bearer
+ *       bearerFormat: JWT
+ *   schemas:
+ *     Schedule:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: integer
+ *           example: 1
+ *         dentist_id:
+ *           type: integer
+ *           example: 101
+ *         date:
+ *           type: string
+ *           format: date
+ *           example: "2025-05-15"
+ *         start_time:
+ *           type: string
+ *           format: time
+ *           example: "09:00"
+ *         end_time:
+ *           type: string
+ *           format: time
+ *           example: "17:00"
+ *         created_at:
+ *           type: string
+ *           format: date-time
+ *           example: "2025-05-01T10:00:00Z"
+ *         updated_at:
+ *           type: string
+ *           format: date-time
+ *           example: "2025-05-10T14:00:00Z"
+ */
+
+/**
+ * @swagger
+ * /schedules:
  *   get:
- *     summary: Get all appointments
- *     description: Retrieves all appointments. Requires authentication.
- *     tags: [Appointments]
+ *     summary: Retrieve all schedules
+ *     tags: [Schedules]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Appointments retrieved successfully.
+ *         description: Schedules retrieved successfully.
  *         content:
  *           application/json:
  *             schema:
@@ -24,18 +63,59 @@
  *               properties:
  *                 message:
  *                   type: string
- *                   example: "Appointments retrieved successfully."
+ *                   example: "Schedules retrieved successfully."
  *                 data:
  *                   type: array
  *                   items:
- *                     $ref: '#/components/schemas/Appointment'
+ *                     $ref: '#/components/schemas/Schedule'
+ *       401:
+ *         description: Unauthorized access. Token missing or invalid.
+ *       500:
+ *         description: Internal Server Error.
+ */
+
+/**
+ * @swagger
+ * /schedules/{id}:
+ *   get:
+ *     summary: Retrieve a schedule by ID
+ *     tags: [Schedules]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: The ID of the schedule.
+ *     responses:
+ *       200:
+ *         description: Schedule retrieved successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Schedule retrieved successfully."
+ *                 data:
+ *                   $ref: '#/components/schemas/Schedule'
+ *       404:
+ *         description: Schedule not found.
  *       401:
  *         description: Unauthorized access.
- *
+ *       500:
+ *         description: Internal Server Error.
+ */
+
+/**
+ * @swagger
+ * /schedules:
  *   post:
- *     summary: Create a new appointment
- *     description: Creates a new appointment. Requires authentication.
- *     tags: [Appointments]
+ *     summary: Create a new schedule
+ *     tags: [Schedules]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -43,44 +123,45 @@
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/AppointmentInput'
+ *             type: object
+ *             required:
+ *               - dentist_id
+ *               - date
+ *               - start_time
+ *               - end_time
+ *             properties:
+ *               dentist_id:
+ *                 type: integer
+ *                 example: 101
+ *               date:
+ *                 type: string
+ *                 format: date
+ *                 example: "2025-05-15"
+ *               start_time:
+ *                 type: string
+ *                 format: time
+ *                 example: "09:00"
+ *               end_time:
+ *                 type: string
+ *                 format: time
+ *                 example: "17:00"
  *     responses:
  *       201:
- *         description: Appointment created successfully.
+ *         description: Schedule created successfully.
  *       400:
- *         description: Invalid input data.
+ *         description: Bad request. Missing required fields.
  *       401:
  *         description: Unauthorized access.
+ *       500:
+ *         description: Internal Server Error.
  */
 
 /**
  * @swagger
- * /appointments/{id}:
- *   get:
- *     summary: Get appointment by ID
- *     description: Retrieves an appointment by its ID. Requires authentication.
- *     tags: [Appointments]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *         description: Appointment ID
- *     responses:
- *       200:
- *         description: Appointment retrieved successfully.
- *       404:
- *         description: Appointment not found.
- *       401:
- *         description: Unauthorized access.
- *
+ * /schedules/{id}:
  *   put:
- *     summary: Update an appointment
- *     description: Updates an existing appointment. Requires authentication.
- *     tags: [Appointments]
+ *     summary: Update an existing schedule
+ *     tags: [Schedules]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -89,27 +170,48 @@
  *         required: true
  *         schema:
  *           type: integer
- *         description: Appointment ID
+ *         description: The ID of the schedule to update.
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/AppointmentInput'
+ *             type: object
+ *             properties:
+ *               dentist_id:
+ *                 type: integer
+ *                 example: 101
+ *               date:
+ *                 type: string
+ *                 format: date
+ *                 example: "2025-05-15"
+ *               start_time:
+ *                 type: string
+ *                 format: time
+ *                 example: "09:00"
+ *               end_time:
+ *                 type: string
+ *                 format: time
+ *                 example: "17:00"
  *     responses:
  *       200:
- *         description: Appointment updated successfully.
- *       400:
- *         description: Invalid input data.
+ *         description: Schedule updated successfully.
  *       404:
- *         description: Appointment not found.
+ *         description: Schedule not found.
+ *       400:
+ *         description: Bad request.
  *       401:
  *         description: Unauthorized access.
- *
+ *       500:
+ *         description: Internal Server Error.
+ */
+
+/**
+ * @swagger
+ * /schedules/{id}:
  *   delete:
- *     summary: Delete an appointment
- *     description: Deletes an appointment by ID. Requires authentication.
- *     tags: [Appointments]
+ *     summary: Delete a schedule
+ *     tags: [Schedules]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -118,146 +220,52 @@
  *         required: true
  *         schema:
  *           type: integer
- *         description: Appointment ID
+ *         description: The ID of the schedule to delete.
  *     responses:
  *       200:
- *         description: Appointment deleted successfully.
+ *         description: Schedule and associated timeslots deleted successfully.
  *       404:
- *         description: Appointment not found.
+ *         description: Schedule not found.
  *       401:
  *         description: Unauthorized access.
+ *       500:
+ *         description: Internal Server Error.
  */
 
 /**
  * @swagger
- * /appointments/by-patient/{patient_id}:
+ * /schedules/dentist/{dentistId}:
  *   get:
- *     summary: Get appointment by patient ID
- *     description: Retrieves appointments for a specific patient. Requires authentication.
- *     tags: [Appointments]
+ *     summary: Retrieve schedules for a specific dentist
+ *     tags: [Schedules]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: patient_id
+ *         name: dentistId
  *         required: true
  *         schema:
  *           type: integer
- *         description: Patient ID
+ *         description: The ID of the dentist.
  *     responses:
  *       200:
- *         description: Appointments retrieved successfully.
+ *         description: Schedules retrieved successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Schedules retrieved successfully."
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Schedule'
  *       404:
- *         description: No appointments found for the patient.
+ *         description: No schedules found for this dentist.
  *       401:
  *         description: Unauthorized access.
- */
-
-/**
- * @swagger
- * /appointments/cancel/{appointment_id}:
- *   patch:
- *     summary: Cancel an appointment
- *     description: Cancels an appointment by updating its status. Requires authentication.
- *     tags: [Appointments]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: appointment_id
- *         required: true
- *         schema:
- *           type: integer
- *         description: Appointment ID
- *     responses:
- *       200:
- *         description: Appointment canceled successfully.
- *       404:
- *         description: Appointment not found.
- *       401:
- *         description: Unauthorized access.
- */
-
-/**
- * @swagger
- * /appointments/getAllAppointmentsWithServicesByPatientId/{patient_id}:
- *   get:
- *     summary: Get all appointments with services by patient ID
- *     description: Retrieves all appointments along with related services for a specific patient. Requires authentication.
- *     tags: [Appointments]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: patient_id
- *         required: true
- *         schema:
- *           type: integer
- *         description: Patient ID
- *     responses:
- *       200:
- *         description: Appointments with services retrieved successfully.
- *       404:
- *         description: No appointments found for this patient.
- *       401:
- *         description: Unauthorized access.
- */
-
-/**
- * @swagger
- * components:
- *   schemas:
- *     Appointment:
- *       type: object
- *       properties:
- *         id:
- *           type: integer
- *           example: 1
- *         patient_id:
- *           type: integer
- *           example: 101
- *         dentist_id:
- *           type: integer
- *           example: 202
- *         schedule_id:
- *           type: integer
- *           example: 303
- *         timeslot_id:
- *           type: integer
- *           example: 404
- *         status:
- *           type: string
- *           example: "confirmed"
- *         appointment_type:
- *           type: string
- *           example: "checkup"
- *     AppointmentInput:
- *       type: object
- *       properties:
- *         patient_id:
- *           type: integer
- *           example: 101
- *         dentist_id:
- *           type: integer
- *           example: 202
- *         schedule_id:
- *           type: integer
- *           example: 303
- *         timeslot_id:
- *           type: integer
- *           example: 404
- *         status:
- *           type: string
- *           example: "pending"
- *         appointment_type:
- *           type: string
- *           example: "consultation"
- *         service_list_id:
- *           type: array
- *           items:
- *             type: integer
- *           example: [1, 2, 3]
- *         health_declaration_id:
- *           type: integer
- *           example: 505
+ *       500:
+ *         description: Internal Server Error.
  */
