@@ -29,37 +29,63 @@ router.get('/', verifyToken, async (req, res) => {
         -- Timeslot Info
         t.id AS timeslot_id,
         t.start_time,
-        t.end_time
+        t.end_time,
+
+        -- Appointment Services
+        aps.service_list_id,
+        sl.service_name,
+        sl.title,
+        sl.[content],
+        sl.photo
 
       FROM appointments AS a
       LEFT JOIN users AS patient ON a.patient_id = patient.id
       LEFT JOIN users AS dentist ON a.dentist_id = dentist.id
       LEFT JOIN schedules AS s ON a.schedule_id = s.id
       LEFT JOIN timeslots AS t ON a.timeslot_id = t.id
+      LEFT JOIN appointment_services AS aps ON aps.appointment_id = a.id
+      LEFT JOIN serviceslist AS sl ON aps.service_list_id = sl.id
     `;
 
     const result = await pool.request().query(query);
 
-    // Map the appointments with patient and dentist full names
-    const appointments = result.recordset.map(row => ({
-      id: row.appointment_id,
-      status: row.status,
-      appointment_type: row.appointment_type,
+    // Grouping services by appointment
+    const appointmentsMap = new Map();
 
-      patient_fullname: row.patient_fullname,
-      dentist_fullname: row.dentist_fullname,
-
-      schedule: {
-        id: row.schedule_id,
-        date: row.schedule_date
-      },
-
-      timeslot: {
-        id: row.timeslot_id,
-        start_time: row.start_time,
-        end_time: row.end_time
+    result.recordset.forEach(row => {
+      if (!appointmentsMap.has(row.appointment_id)) {
+        appointmentsMap.set(row.appointment_id, {
+          id: row.appointment_id,
+          status: row.status,
+          appointment_type: row.appointment_type,
+          patient_fullname: row.patient_fullname,
+          dentist_fullname: row.dentist_fullname,
+          schedule: {
+            id: row.schedule_id,
+            date: row.schedule_date
+          },
+          timeslot: {
+            id: row.timeslot_id,
+            start_time: row.start_time,
+            end_time: row.end_time
+          },
+          services: [] // Initialize services array
+        });
       }
-    }));
+
+      // Add service if it exists
+      if (row.service_list_id) {
+        appointmentsMap.get(row.appointment_id).services.push({
+          id: row.service_list_id,
+          service_name: row.service_name,
+          title: row.title,
+          content: row.content,
+          photo: row.photo
+        });
+      }
+    });
+
+    const appointments = Array.from(appointmentsMap.values());
 
     successResponse(res, 'Appointments retrieved successfully.', appointments);
   } catch (error) {
@@ -67,6 +93,7 @@ router.get('/', verifyToken, async (req, res) => {
     errorResponse(res, 'Error fetching appointments.', null, error.message, 500);
   }
 });
+
 
 
 
