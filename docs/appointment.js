@@ -9,14 +9,14 @@
  * @swagger
  * /appointments:
  *   get:
- *     summary: Get all appointments
- *     description: Retrieves all appointments. Requires authentication.
+ *     summary: Retrieve all appointments
+ *     description: Fetches all appointments along with related details such as patient, dentist, schedule, timeslot, and services. Requires authentication.
  *     tags: [Appointments]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Appointments retrieved successfully.
+ *         description: Successfully retrieved all appointments.
  *         content:
  *           application/json:
  *             schema:
@@ -30,13 +30,14 @@
  *                   items:
  *                     $ref: '#/components/schemas/Appointment'
  *       401:
- *         description: Unauthorized access.
+ *         description: Unauthorized access. Token is missing or invalid.
  *
  *   post:
  *     summary: Create a new appointment
  *     description: |
  *       Creates a new appointment. Requires authentication.
- *       - Appointment creation requires an existing health declaration for the patient (validated automatically).
+ *       
+ *       - The patient must have an existing health declaration (automatically validated).
  *       - If the health declaration is missing, the appointment will not be created.
  *     tags: [Appointments]
  *     security:
@@ -49,7 +50,7 @@
  *             $ref: '#/components/schemas/AppointmentInput'
  *     responses:
  *       201:
- *         description: Appointment created successfully.
+ *         description: Successfully created an appointment.
  *         content:
  *           application/json:
  *             schema:
@@ -67,12 +68,122 @@
  *       400:
  *         description: |
  *           Invalid input data or missing health declaration.
- *           Example error messages:
+ *           Possible error messages:
  *           - "Missing required fields or invalid service list."
  *           - "Health declaration not found. Appointment cannot be created."
  *       401:
- *         description: Unauthorized access.
+ *         description: Unauthorized access. Token is missing or invalid.
+ *
+ * components:
+ *   schemas:
+ *     Appointment:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: integer
+ *           example: 6
+ *         status:
+ *           type: string
+ *           example: "pending"
+ *         appointment_type:
+ *           type: string
+ *           example: "online"
+ *         patient:
+ *           type: object
+ *           properties:
+ *             id:
+ *               type: integer
+ *               example: 1
+ *             fullname:
+ *               type: string
+ *               example: "John Doe"
+ *         dentist:
+ *           type: object
+ *           properties:
+ *             id:
+ *               type: integer
+ *               example: 11
+ *             fullname:
+ *               type: string
+ *               example: "Dr. Jane Smith"
+ *         schedule:
+ *           type: object
+ *           properties:
+ *             id:
+ *               type: integer
+ *               example: 28
+ *             date:
+ *               type: string
+ *               example: "2025-02-12"
+ *         timeslot:
+ *           type: object
+ *           properties:
+ *             id:
+ *               type: integer
+ *               example: 86
+ *             start_time:
+ *               type: string
+ *               example: "07:00"
+ *             end_time:
+ *               type: string
+ *               example: "08:00"
+ *         services:
+ *           type: array
+ *           items:
+ *             type: object
+ *             properties:
+ *               id:
+ *                 type: integer
+ *                 example: 2
+ *               service_name:
+ *                 type: string
+ *                 example: "Dental Implants"
+ *               title:
+ *                 type: string
+ *                 example: "Restore Your Confidence"
+ *               content:
+ *                 type: string
+ *                 example: "Get high-quality dental implants..."
+ *               photo:
+ *                 type: string
+ *                 example: "https://example.com/images/implants.jpg"
+ *
+ *     AppointmentInput:
+ *       type: object
+ *       required:
+ *         - patient_id
+ *         - dentist_id
+ *         - schedule_id
+ *         - timeslot_id
+ *         - status
+ *         - appointment_type
+ *         - service_list_id
+ *       properties:
+ *         patient_id:
+ *           type: integer
+ *           example: 1
+ *         dentist_id:
+ *           type: integer
+ *           example: 11
+ *         schedule_id:
+ *           type: integer
+ *           example: 28
+ *         timeslot_id:
+ *           type: integer
+ *           example: 86
+ *         status:
+ *           type: string
+ *           example: "pending"
+ *         appointment_type:
+ *           type: string
+ *           example: "online"
+ *         service_list_id:
+ *           type: array
+ *           items:
+ *             type: integer
+ *           example: [2, 1]
  */
+
 
 /**
  * @swagger

@@ -16,10 +16,12 @@ router.get('/', verifyToken, async (req, res) => {
         a.status,
         a.appointment_type,
 
-        -- Patient Full Name
+        -- Patient Info
+        patient.id AS patient_id,
         patient.fullname AS patient_fullname,
 
-        -- Dentist Full Name
+        -- Dentist Info
+        dentist.id AS dentist_id,
         dentist.fullname AS dentist_fullname,
 
         -- Schedule Info
@@ -45,11 +47,12 @@ router.get('/', verifyToken, async (req, res) => {
       LEFT JOIN timeslots AS t ON a.timeslot_id = t.id
       LEFT JOIN appointment_services AS aps ON aps.appointment_id = a.id
       LEFT JOIN serviceslist AS sl ON aps.service_list_id = sl.id
+      ORDER BY a.id;  -- ✅ Ensure consistent ordering
     `;
 
     const result = await pool.request().query(query);
 
-    // Grouping services by appointment
+    // ✅ Group appointments by ID
     const appointmentsMap = new Map();
 
     result.recordset.forEach(row => {
@@ -58,30 +61,48 @@ router.get('/', verifyToken, async (req, res) => {
           id: row.appointment_id,
           status: row.status,
           appointment_type: row.appointment_type,
-          patient_fullname: row.patient_fullname,
-          dentist_fullname: row.dentist_fullname,
+
+          // ✅ Restructured Patient Object
+          patient: {
+            id: row.patient_id,
+            fullname: row.patient_fullname
+          },
+
+          // ✅ Restructured Dentist Object
+          dentist: {
+            id: row.dentist_id,
+            fullname: row.dentist_fullname
+          },
+
           schedule: {
             id: row.schedule_id,
             date: row.schedule_date
           },
+
           timeslot: {
             id: row.timeslot_id,
             start_time: row.start_time,
             end_time: row.end_time
           },
-          services: [] // Initialize services array
+
+          services: [] // ✅ Initialize services array
         });
       }
 
-      // Add service if it exists
+      // ✅ Add services only if they exist
       if (row.service_list_id) {
-        appointmentsMap.get(row.appointment_id).services.push({
-          id: row.service_list_id,
-          service_name: row.service_name,
-          title: row.title,
-          content: row.content,
-          photo: row.photo
-        });
+        const appointment = appointmentsMap.get(row.appointment_id);
+        const existingService = appointment.services.find(s => s.id === row.service_list_id);
+
+        if (!existingService) {
+          appointment.services.push({
+            id: row.service_list_id,
+            service_name: row.service_name,
+            title: row.title,
+            content: row.content,
+            photo: row.photo
+          });
+        }
       }
     });
 
@@ -93,6 +114,7 @@ router.get('/', verifyToken, async (req, res) => {
     errorResponse(res, 'Error fetching appointments.', null, error.message, 500);
   }
 });
+
 
 
 
